@@ -1,0 +1,267 @@
+
+ADC_Button.elf:     file format elf32-avr
+
+Sections:
+Idx Name          Size      VMA       LMA       File off  Algn
+  0 .text         000000f8  00000000  00000000  00000074  2**1
+                  CONTENTS, ALLOC, LOAD, READONLY, CODE
+  1 .data         00000000  00800060  00800060  0000016c  2**0
+                  CONTENTS, ALLOC, LOAD, DATA
+  2 .bss          00000004  00800060  00800060  0000016c  2**0
+                  ALLOC
+  3 .comment      00000030  00000000  00000000  0000016c  2**0
+                  CONTENTS, READONLY
+  4 .note.gnu.avr.deviceinfo 0000003c  00000000  00000000  0000019c  2**2
+                  CONTENTS, READONLY
+  5 .debug_aranges 00000028  00000000  00000000  000001d8  2**0
+                  CONTENTS, READONLY, DEBUGGING
+  6 .debug_info   0000010c  00000000  00000000  00000200  2**0
+                  CONTENTS, READONLY, DEBUGGING
+  7 .debug_abbrev 000000c3  00000000  00000000  0000030c  2**0
+                  CONTENTS, READONLY, DEBUGGING
+  8 .debug_line   000000df  00000000  00000000  000003cf  2**0
+                  CONTENTS, READONLY, DEBUGGING
+  9 .debug_frame  00000048  00000000  00000000  000004b0  2**2
+                  CONTENTS, READONLY, DEBUGGING
+ 10 .debug_str    00000178  00000000  00000000  000004f8  2**0
+                  CONTENTS, READONLY, DEBUGGING
+ 11 .debug_loc    00000086  00000000  00000000  00000670  2**0
+                  CONTENTS, READONLY, DEBUGGING
+ 12 .debug_ranges 00000018  00000000  00000000  000006f6  2**0
+                  CONTENTS, READONLY, DEBUGGING
+
+Disassembly of section .text:
+
+00000000 <__vectors>:
+   0:	09 c0       	rjmp	.+18     	; 0x14 <__ctors_end>
+   2:	16 c0       	rjmp	.+44     	; 0x30 <__bad_interrupt>
+   4:	15 c0       	rjmp	.+42     	; 0x30 <__bad_interrupt>
+   6:	14 c0       	rjmp	.+40     	; 0x30 <__bad_interrupt>
+   8:	13 c0       	rjmp	.+38     	; 0x30 <__bad_interrupt>
+   a:	12 c0       	rjmp	.+36     	; 0x30 <__bad_interrupt>
+   c:	11 c0       	rjmp	.+34     	; 0x30 <__bad_interrupt>
+   e:	10 c0       	rjmp	.+32     	; 0x30 <__bad_interrupt>
+  10:	0f c0       	rjmp	.+30     	; 0x30 <__bad_interrupt>
+  12:	32 c0       	rjmp	.+100    	; 0x78 <__vector_9>
+
+00000014 <__ctors_end>:
+  14:	11 24       	eor	r1, r1
+  16:	1f be       	out	0x3f, r1	; 63
+  18:	cf e9       	ldi	r28, 0x9F	; 159
+  1a:	cd bf       	out	0x3d, r28	; 61
+
+0000001c <__do_clear_bss>:
+  1c:	20 e0       	ldi	r18, 0x00	; 0
+  1e:	a0 e6       	ldi	r26, 0x60	; 96
+  20:	b0 e0       	ldi	r27, 0x00	; 0
+  22:	01 c0       	rjmp	.+2      	; 0x26 <.do_clear_bss_start>
+
+00000024 <.do_clear_bss_loop>:
+  24:	1d 92       	st	X+, r1
+
+00000026 <.do_clear_bss_start>:
+  26:	a4 36       	cpi	r26, 0x64	; 100
+  28:	b2 07       	cpc	r27, r18
+  2a:	e1 f7       	brne	.-8      	; 0x24 <.do_clear_bss_loop>
+  2c:	02 d0       	rcall	.+4      	; 0x32 <main>
+  2e:	62 c0       	rjmp	.+196    	; 0xf4 <_exit>
+
+00000030 <__bad_interrupt>:
+  30:	e7 cf       	rjmp	.-50     	; 0x0 <__vectors>
+
+00000032 <main>:
+unsigned char tmp;
+
+int main( void )
+{  
+	//настраиваем порты
+	DDRB = 0xff;
+  32:	8f ef       	ldi	r24, 0xFF	; 255
+  34:	87 bb       	out	0x17, r24	; 23
+	DDRB&=~((1<<PB4));
+  36:	bc 98       	cbi	0x17, 4	; 23
+	PORTB = 0x00;
+  38:	18 ba       	out	0x18, r1	; 24
+
+	//инициализируем АЦП
+	//ион - напряжение питания, выравнивание влево, второй канал(PB4)
+	ADMUX = (0<<REFS0)|(1<<ADLAR)|(1<<MUX1)|(0<<MUX0);
+  3a:	82 e2       	ldi	r24, 0x22	; 34
+  3c:	87 b9       	out	0x07, r24	; 7
+	//вкл. ацп, режим одиночного преобразования, разрешение прерывания, частота преобр. = FCPU/128
+	ADCSRA = (1<<ADEN)|(0<<ADSC)|(0<<ADATE)|(1<<ADIE)|(1<<ADPS2)|(1<<ADPS1)|(1<<ADPS0);
+  3e:	8f e8       	ldi	r24, 0x8F	; 143
+  40:	86 b9       	out	0x06, r24	; 6
+
+	//разрешаем прерывания и запускаем преобразование
+	sei();
+  42:	78 94       	sei
+	StartConvAdc();
+  44:	36 9a       	sbi	0x06, 6	; 6
+	{
+		tmp = KeyBuf;
+		if (tmp)
+		{
+			tmp--;
+			PORTB |=(1<<tmp);
+  46:	21 e0       	ldi	r18, 0x01	; 1
+  48:	30 e0       	ldi	r19, 0x00	; 0
+	sei();
+	StartConvAdc();
+
+	while(1)
+	{
+		tmp = KeyBuf;
+  4a:	80 91 62 00 	lds	r24, 0x0062
+  4e:	80 93 63 00 	sts	0x0063, r24
+		if (tmp)
+  52:	88 23       	and	r24, r24
+  54:	71 f0       	breq	.+28     	; 0x72 <__SREG__+0x33>
+		{
+			tmp--;
+  56:	81 50       	subi	r24, 0x01	; 1
+  58:	80 93 63 00 	sts	0x0063, r24
+			PORTB |=(1<<tmp);
+  5c:	48 b3       	in	r20, 0x18	; 24
+  5e:	b9 01       	movw	r22, r18
+  60:	02 c0       	rjmp	.+4      	; 0x66 <__SREG__+0x27>
+  62:	66 0f       	add	r22, r22
+  64:	77 1f       	adc	r23, r23
+  66:	8a 95       	dec	r24
+  68:	e2 f7       	brpl	.-8      	; 0x62 <__SREG__+0x23>
+  6a:	cb 01       	movw	r24, r22
+  6c:	84 2b       	or	r24, r20
+  6e:	88 bb       	out	0x18, r24	; 24
+  70:	ec cf       	rjmp	.-40     	; 0x4a <__SREG__+0xb>
+		}
+		else
+		PORTB &=~(0xFF);
+  72:	88 b3       	in	r24, 0x18	; 24
+  74:	18 ba       	out	0x18, r1	; 24
+  76:	e9 cf       	rjmp	.-46     	; 0x4a <__SREG__+0xb>
+
+00000078 <__vector_9>:
+	}
+	return 0;
+}
+ISR(ADC_vect)
+{
+  78:	1f 92       	push	r1
+  7a:	0f 92       	push	r0
+  7c:	0f b6       	in	r0, 0x3f	; 63
+  7e:	0f 92       	push	r0
+  80:	11 24       	eor	r1, r1
+  82:	8f 93       	push	r24
+  84:	9f 93       	push	r25
+		unsigned char AdcBuf;
+		unsigned char Key;
+		static unsigned char LastState;
+		
+		//считываем старший регистр АЦП
+		AdcBuf = ADCH;
+  86:	95 b1       	in	r25, 0x05	; 5
+		
+		//опеределяем в какой диапазон он попал
+		if (AdcBuf > 240)
+  88:	91 3f       	cpi	r25, 0xF1	; 241
+  8a:	48 f4       	brcc	.+18     	; 0x9e <__vector_9+0x26>
+		Key = KEY_S4;
+		else if (AdcBuf > 180)
+  8c:	95 3b       	cpi	r25, 0xB5	; 181
+  8e:	48 f4       	brcc	.+18     	; 0xa2 <__stack+0x3>
+		Key = KEY_S3;
+		else if (AdcBuf > 120)
+  90:	99 37       	cpi	r25, 0x79	; 121
+  92:	48 f4       	brcc	.+18     	; 0xa6 <__stack+0x7>
+		Key = KEY_S2;
+		else if (AdcBuf > 35)
+  94:	81 e0       	ldi	r24, 0x01	; 1
+  96:	94 32       	cpi	r25, 0x24	; 36
+  98:	38 f4       	brcc	.+14     	; 0xa8 <__stack+0x9>
+  9a:	80 e0       	ldi	r24, 0x00	; 0
+  9c:	05 c0       	rjmp	.+10     	; 0xa8 <__stack+0x9>
+		//считываем старший регистр АЦП
+		AdcBuf = ADCH;
+		
+		//опеределяем в какой диапазон он попал
+		if (AdcBuf > 240)
+		Key = KEY_S4;
+  9e:	84 e0       	ldi	r24, 0x04	; 4
+  a0:	03 c0       	rjmp	.+6      	; 0xa8 <__stack+0x9>
+		else if (AdcBuf > 180)
+		Key = KEY_S3;
+  a2:	83 e0       	ldi	r24, 0x03	; 3
+  a4:	01 c0       	rjmp	.+2      	; 0xa8 <__stack+0x9>
+		else if (AdcBuf > 120)
+		Key = KEY_S2;
+  a6:	82 e0       	ldi	r24, 0x02	; 2
+		else if (AdcBuf > 35)
+		Key = KEY_S1;
+		else
+		Key = KEY_NULL;
+		
+		KeyBuf=Key;
+  a8:	80 93 62 00 	sts	0x0062, r24
+		//защита от дребезга и не только. если нажата какая-нибудь кнопка
+		//сравниваем совпадают ли текущее состояние и предыдущее
+		//если совпадают - проверяем счетчик comp, если нет обнуляем его
+		// 		//кнопка считается нажатой если она удерживается в течении 100
+		// 		//преобразований АЦП
+		if (Key)
+  ac:	88 23       	and	r24, r24
+  ae:	a1 f0       	breq	.+40     	; 0xd8 <__stack+0x39>
+		{
+			if (Key == LastState)
+  b0:	90 91 60 00 	lds	r25, 0x0060
+  b4:	89 13       	cpse	r24, r25
+  b6:	0b c0       	rjmp	.+22     	; 0xce <__stack+0x2f>
+			{
+				if (comp > 100)
+  b8:	90 91 61 00 	lds	r25, 0x0061
+  bc:	95 36       	cpi	r25, 0x65	; 101
+  be:	18 f0       	brcs	.+6      	; 0xc6 <__stack+0x27>
+				KeyBuf=Key;
+  c0:	80 93 62 00 	sts	0x0062, r24
+  c4:	0f c0       	rjmp	.+30     	; 0xe4 <__stack+0x45>
+				else
+				comp++;
+  c6:	9f 5f       	subi	r25, 0xFF	; 255
+  c8:	90 93 61 00 	sts	0x0061, r25
+  cc:	0b c0       	rjmp	.+22     	; 0xe4 <__stack+0x45>
+			}
+			else
+			{
+				LastState = Key;
+  ce:	80 93 60 00 	sts	0x0060, r24
+				comp = 0;
+  d2:	10 92 61 00 	sts	0x0061, r1
+  d6:	06 c0       	rjmp	.+12     	; 0xe4 <__stack+0x45>
+			}
+		}
+		else
+		{
+			comp = 0;
+  d8:	10 92 61 00 	sts	0x0061, r1
+			KeyBuf = KEY_NULL;
+  dc:	10 92 62 00 	sts	0x0062, r1
+			LastState = KEY_NULL;
+  e0:	10 92 60 00 	sts	0x0060, r1
+		}
+
+		//запускаем преобразование и выходим
+		StartConvAdc();
+  e4:	36 9a       	sbi	0x06, 6	; 6
+}
+  e6:	9f 91       	pop	r25
+  e8:	8f 91       	pop	r24
+  ea:	0f 90       	pop	r0
+  ec:	0f be       	out	0x3f, r0	; 63
+  ee:	0f 90       	pop	r0
+  f0:	1f 90       	pop	r1
+  f2:	18 95       	reti
+
+000000f4 <_exit>:
+  f4:	f8 94       	cli
+
+000000f6 <__stop_program>:
+  f6:	ff cf       	rjmp	.-2      	; 0xf6 <__stop_program>
